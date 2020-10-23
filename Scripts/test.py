@@ -1,90 +1,53 @@
-
-import cv2
+from dataloader_test import TestDataLoader
+from tensorflow.keras.models import load_model
 import os
-import matplotlib.pyplot as plt
-from PIL import Image
-import skimage.external.tifffile as tif
 import numpy as np
-
-train_dataset_path = '../../HyRANK_satellite/TrainingSet'
-val_dataset_path = '../../HyRANK_satellite/ValidationSet'
-
-img = tif.imread(os.path.join(train_dataset_path, 'Loukia.tif'))
-img_GT = tif.imread(os.path.join(train_dataset_path, 'Loukia_GT.tif'))
+import skimage.external.tifffile as tif
+from PIL import Image
+from utils import get_color_dict, create_folder
 
 
-print(img.shape)
-print(img_GT.shape)
+def test_model(test_imgs_path, model_folder, save_folder, batch_size=256):
 
-total_dict = dict()
+    create_folder(save_folder)
 
-for x in range(img.shape[0]):
-    for y in range(img.shape[1]):
-        if (img_GT[x][y] > 0 and img_GT[x][y] not in total_dict.keys()):
-            total_dict[img_GT[x][y]] = list()
-        
-        if img_GT[x][y] > 0:
-            total_dict[img_GT[x][y]].append(img[x][y])
+    color_dict = get_color_dict()
 
+    model_path = os.path.join(model_folder, 'best_model.h5')
+    model = load_model(model_path)
+    spatial_size = model.input.shape[1]
 
-avg_dict = dict()
+    loader = TestDataLoader(data_spatial_size=spatial_size,
+                            pca_load_folder=model_folder)
 
-for k,v in total_dict.items():
-    avg_dict[k] = np.mean(v, axis=0)
+    for img_name in os.listdir(test_imgs_path):
 
+        img_path = os.path.join(test_imgs_path, img_name)
+        test_img = tif.imread(img_path)
+        img_preds = list()
 
+        for batch in loader.batchify_image(test_img, batch_size):
+            pred = model(batch, training=False)
+            pred = np.argmax(pred, axis=1)
+            img_preds += pred.tolist()
 
-for k, v in avg_dict.items():
-    print(k, v.shape)
+        img_pred = np.zeros((test_img.shape[0], test_img.shape[1], 3))
+        img_preds = np.reshape(np.array(img_preds),
+                               [test_img.shape[0], test_img.shape[1]])
 
+        for cls_idx in range(14):
+            img_pred[img_preds == cls_idx] = color_dict[cls_idx]
 
-color_dict = dict()
-color_dict[1] = (255,2,4)
-color_dict[2] = (192,52,111)
-color_dict[3] = (235, 233, 36)
-color_dict[4] = (244, 126, 39)
-color_dict[5] = (235, 181, 71)
-color_dict[6] = (0, 173, 48)
-color_dict[7] = (0, 72, 24)
-color_dict[8] = (90, 30, 106)
-color_dict[9] = (113, 122, 50)
-color_dict[10] = (192, 173, 69)
-color_dict[11] = (214, 236, 101)
-color_dict[12] = (172, 183, 187)
-color_dict[13] = (39, 76, 212)
-color_dict[14] = (96, 229, 254)
+        img_pred = img_pred.astype(np.uint8)
+
+        pil_image = Image.fromarray(img_pred, 'RGB')
+        pil_image.save('{}/{}.png'.format(save_folder, img_name.split('.')[0]))
 
 
+if __name__ == '__main__':
 
-def calc_min_distance(vector):
-    minkey = 0
-    mindist = None
+    test_imgs_path = '../../HyRANK_satellite/ValidationSet'
+    model_folder = '/home/alexnikop/up2metric/hyspectral/Scripts/model_size_9_spec_14'
+    save_folder = 'results'
 
-    for k,v in avg_dict.items():
-        dist = np.linalg.norm(vector - v)
-        if (minkey == 0 or dist < mindist):
-            minkey = k
-            mindist = dist
-    
-    return minkey, mindist
-
-class_img = np.zeros((img.shape[0], img.shape[1], 3))
-
-for x in range(img.shape[0]):
-    for y in range(img.shape[1]):
-        minkey, mindist = calc_min_distance(img[x][y])
-        chosen_color = color_dict[minkey]
-        class_img[x][y][0] = chosen_color[0]
-        class_img[x][y][1] = chosen_color[1]
-        class_img[x][y][2] = chosen_color[2]
-
-
-print(np.unique(class_img))
-
-save_img = Image.fromarray(class_img, 'RGB')
-save_img.save('test.png')
-'''
-unique, counts = np.unique(img, return_counts=True)
-oc_dict = dict(zip(unique, counts))
-print(oc_dict)
-'''
+    test_model(test_imgs_path, model_folder, save_folder)
