@@ -18,6 +18,8 @@ class TestDataLoader:
         with open('{}/pca.pkl'.format(pca_load_folder), 'rb') as f:
             self.pca = pickle.load(f)
 
+    # apply trained pca on data to reduce 
+    # spectral dimension
     def convert_pca(self, X):
 
         # reshape along spectral dimension
@@ -41,6 +43,8 @@ class TestDataLoader:
              y_offset:X.shape[1] + y_offset, :] = X
         return newX
 
+    # create data cubes for all input image points and 
+    # return them for prediction
     def batchify_image(self, test_img, batch_size):
 
         margin = int((self.data_spatial_size - 1) / 2)
@@ -73,7 +77,7 @@ class TestDataLoader:
 if __name__ == '__main__':
 
     loader = TestDataLoader(data_spatial_size=15)
-    img_path = '/home/alexnikop/up2metric/HyRANK_satellite/ValidationSet/Erato.tif'
+    img_path = '../../HyRANK_satellite/ValidationSet/Erato.tif'
     batch_size = 256
 
     counter = 0

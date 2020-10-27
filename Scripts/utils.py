@@ -1,7 +1,8 @@
 import os
 import shutil
 
-
+# color dict maps each class label
+# to it's designated color 
 def get_color_dict():
 
     color_dict = dict()
@@ -23,6 +24,7 @@ def get_color_dict():
     return color_dict
 
 
+# create folder.
 def create_folder(folder_name):
     if os.path.exists(folder_name):
         shutil.rmtree(folder_name)
